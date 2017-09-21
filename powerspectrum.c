@@ -36,6 +36,7 @@ int powerspectrum(int dims, fftw_complex *outfield, fftw_complex *outfield2, int
 {
         /*How many bins per unit (log) interval in k?*/
         const double binsperunit=(nrbins-1)/log(sqrt(3)*dims/2.0);
+        const int half_dims = dims/2;
         /* Now we compute the powerspectrum in each direction.
          * FFTW is unnormalised, so we need to scale by the length of the array
          * (we do this later). */
@@ -53,41 +54,44 @@ int powerspectrum(int dims, fftw_complex *outfield, fftw_complex *outfield2, int
                  * Use the symmetry of the real fourier transform to half the final dimension.*/
                 #pragma omp for nowait
                 for(int i=0; i<dims;i++){
-                        int indx=i*dims*(dims/2+1);
-                        for(int j=0; j<dims; j++){
-                                int indy=j*(dims/2+1);
-                                /* The k=0 and N/2 mode need special treatment here, 
-                                 * as they alone are not doubled.*/
-                                /*Do k=0 mode.*/
-                                int index=indx+indy;
-                                double kk=sqrt(pow(KVAL(i),2)+pow(KVAL(j),2));
-                                //We don't want the 0,0,0 mode as that is just the mean of the field.
-                                if (kk > 0) {
-                                    int psindex=floor(binsperunit*log(kk));
-                                    assert(psindex < nrbins);
-                                    powerpriv[psindex] += (outfield[index][0]*outfield2[index][0]+outfield[index][1]*outfield2[index][1])*pow(invwindow(KVAL(i),KVAL(j),0,dims),2);
-                                    keffspriv[psindex]+=kk;
-                                    countpriv[psindex]++;
-                                }
-                                /*Now do the k=N/2 mode*/
-                                index=indx+indy+dims/2;
-                                kk=sqrt(pow(KVAL(i),2)+pow(KVAL(j),2)+pow(KVAL(dims/2),2));
-                                int psindex=floor(binsperunit*log(kk));
-                                assert(psindex < nrbins);
-                                powerpriv[psindex] += (outfield[index][0]*outfield2[index][0]+outfield[index][1]*outfield2[index][1])*pow(invwindow(KVAL(i),KVAL(j),KVAL(dims/2),dims),2);
-                                keffspriv[psindex]+=kk;
-                                countpriv[psindex]++;
-                                /*Now do the rest. Because of the symmetry, each mode counts twice.*/
-                                for(int k=1; k<dims/2; k++){
-                                        index=indx+indy+k;
-                                        kk=sqrt(pow(KVAL(i),2)+pow(KVAL(j),2)+pow(KVAL(k),2));
-                                        int psindex=floor(binsperunit*log(kk));
-                                        assert(psindex < nrbins);
-                                        powerpriv[psindex]+=2*(outfield[index][0]*outfield2[index][0]+outfield[index][1]*outfield2[index][1])*pow(invwindow(KVAL(i),KVAL(j),KVAL(k),dims),2);
-                                        countpriv[psindex]+=2;
-                                        keffspriv[psindex]+=2*kk;
-                                }
-                        }
+                  int indx=i*dims*(half_dims+1);
+                  for(int j=0; j<dims; j++){
+                    int indy=j*(half_dims+1);
+                    /* The k=0 and N/2 mode need special treatment here, 
+                     * as they alone are not doubled.*/
+                    /*Do k=0 mode.*/
+                    int index=indx+indy;
+                    double kk=sqrt(KVAL(i)*KVAL(i) + KVAL(j)*KVAL(j));
+                    //We don't want the 0,0,0 mode as that is just the mean of the field.
+                    if (kk > 0) {
+                      int psindex=floor(binsperunit*log(kk));
+                      assert(psindex < nrbins);
+                      double tmp = invwindow(KVAL(i),KVAL(j),0,dims);
+                      powerpriv[psindex] += (outfield[index][0]*outfield2[index][0]+outfield[index][1]*outfield2[index][1])*tmp*tmp;
+                      keffspriv[psindex]+=kk;
+                      countpriv[psindex]++;
+                    }
+                    /*Now do the k=N/2 mode*/
+                    index=indx + indy + half_dims;
+                    kk=sqrt(KVAL(i)*KVAL(i) + KVAL(j)*KVAL(j) + KVAL(half_dims)*KVAL(half_dims));
+                    int psindex=floor(binsperunit*log(kk));
+                    assert(psindex < nrbins);
+                    double tmp=invwindow(KVAL(i),KVAL(j),KVAL(half_dims),dims);
+                    powerpriv[psindex] += (outfield[index][0]*outfield2[index][0]+outfield[index][1]*outfield2[index][1])*tmp*tmp;
+                    keffspriv[psindex]+=kk;
+                    countpriv[psindex]++;
+                    /*Now do the rest. Because of the symmetry, each mode counts twice.*/
+                    for(int k=1; k<half_dims; k++){
+                      index=indx+indy+k;
+                      kk=sqrt(KVAL(i)*KVAL(i) + KVAL(j)*KVAL(j) + KVAL(k)*KVAL(k));
+                      int psindex=floor(binsperunit*log(kk));
+                      assert(psindex < nrbins);
+                      tmp = invwindow(KVAL(i),KVAL(j),KVAL(k),dims);
+                      powerpriv[psindex]+=2.0*(outfield[index][0]*outfield2[index][0]+outfield[index][1]*outfield2[index][1])*tmp*tmp;
+                      countpriv[psindex]+=2;
+                      keffspriv[psindex]+=2.0*kk;
+                    }
+                  }
                 }
                 //Can't do reductions on arrays yet.
                 #pragma omp critical
