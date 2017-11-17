@@ -74,6 +74,10 @@ int read_fieldize_hdf5(GENFLOAT * field, const char *ffname, int type, double bo
 /* this routine loads header data from the first file of an HDF5 snapshot.*/
 int load_hdf5_header(const char *ffname, double  *atime, double *redshift, double *box100, double *h100, int64_t *npart_all, double * mass);
 
+/* this routine reads the number of snapshot files per snapshot from the header of the HDF5 snapshot*/
+int get_numfiles_from_header(const char *ffname);
+
+
 /** Finds a snapshot set of hdf files from the given initial filename
  */
 std::vector<std::string> find_hdf_set(const std::string& infname);

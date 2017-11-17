@@ -153,8 +153,11 @@ std::vector<std::string> find_hdf_set(const std::string& infname)
     //If can't find the file index, not a set but a single file.
     if(i_fileno == std::string::npos)
         return files;
+
+    const int numfiles = get_numfiles_from_header(fname.c_str());
+
     //Find filename, starting at 1
-    for(int fileno = 1; fileno < 1000; fileno++) {
+    for(int fileno = 1; fileno < numfiles; fileno++) {
         std::string ffname;
         std::ostringstream convert;
         convert<<fileno;
@@ -211,6 +214,35 @@ hsize_t get_triple_dataset(const char *name, GENPK_FLOAT_TYPE * data_ptr, hsize_
           return vlength[0];
 }
 
+int get_numfiles_from_header(const char *ffname)
+{
+  hid_t hdf_group,hdf_file;
+  int numfiles_per_snap=-1;
+  hdf_file=H5Fopen(ffname,H5F_ACC_RDONLY,H5P_DEFAULT);
+  if(hdf_file < 0){
+        return -1;
+  }
+  if ( (hdf_group=H5Gopen(hdf_file,"/Header",H5P_DEFAULT)) < 0) {
+        H5Fclose(hdf_file);
+        return -1;
+  }
+
+  /* Read some header functions */
+  if(H5LTget_attribute_int(hdf_group,".","NumFilesPerSnapshot",&numfiles_per_snap)) {
+      fprintf(stderr,"Failed to read `NumFilesPerSnapshot` from hdf5 header\n");
+      perror(NULL);
+  } else {
+      if(numfiles_per_snap <= 0){
+          fprintf(stderr,"Number of files per snapshot (=%d) must be at least 1. Perhaps file data got corrupted?\n",numfiles_per_snap);
+      }
+  }
+  H5Gclose(hdf_group);
+  H5Fclose(hdf_file);
+
+  return numfiles_per_snap;
+}
+
+
 /* this routine loads header data from the first file of an HDF5 snapshot.*/
 int load_hdf5_header(const char *ffname, double  *atime, double *redshift, double *box100, double *h100, int64_t *npart_all, double * mass)
 {
@@ -236,7 +268,7 @@ int load_hdf5_header(const char *ffname, double  *atime, double *redshift, doubl
      H5LTget_attribute_double(hdf_group,".","Omega0", &Omega0) ||
      H5LTget_attribute_double(hdf_group,".","OmegaLambda", &OmegaLambda) ||
      H5LTget_attribute_int(hdf_group,".","Flag_Cooling",&flag_cooling)){
-          fprintf(stderr,"Failed to read some header value\n");
+      fprintf(stderr,"Failed to read some header value\n");
       H5Gclose(hdf_group);
       H5Fclose(hdf_file);
       return -1;

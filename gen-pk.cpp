@@ -132,6 +132,15 @@ int main(int argc, char* argv[])
         fprintf(stderr, "Could not load header\n");
         return 1;
       }
+
+      //Check that the number of files in 'fnames' is the same as the numfiles in the header
+      int numfiles = get_numfiles_from_header(fnames[0].c_str());
+      if(numfiles != fnames.size()) {
+          fprintf(stderr,"Error: The number of files in the directory = %zu does not match the number of files per snapshot specified in the header = %d\n",
+                  fnames.size(), numfiles);
+          fprintf(stderr,"Perhaps output from an older run exists in the same directory as a new run?\n");
+          return 1;
+      }
   }
   else
 #endif
