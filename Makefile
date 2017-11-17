@@ -1,4 +1,3 @@
-
 #Change this to where you installed GadgetReader
 GREAD=${CURDIR}/GadgetReader
 
@@ -11,7 +10,8 @@ ifeq ($(shell pkg-config --exists hdf5-serial && echo 1),1)
 	HDF_LINK = $(shell pkg-config --libs hdf5-serial) -lhdf5_hl
 	HDF_INC = $(shell pkg-config --cflags hdf5-serial)
 else
-	HDF_LINK = -lhdf5 -lhdf5_hl
+	HDF_INC = $(HDF5_BASE)/include
+	HDF_LINK = -L${HDF5_BASE}/lib -lhdf5 -lhdf5_hl -Xlinker -rpath -Xlinker ${HDF5_BASE}/lib
 endif
 
 LFLAGS += -lfftw3_threads -lfftw3 -lpthread -lrgad -L${GREAD} -Wl,-rpath,$(GREAD) $(HDF_LINK) -Lbigfile/src -lbigfile
@@ -24,10 +24,10 @@ ifneq (unknown,$(findstring unknown,${LDCHECK}))
 endif
 #Are we using gcc or icc?
 ifeq (icc,$(findstring icc,${CC}))
-  CFLAGS +=-O2 -g -c -w1 -openmp $(OPT) -I${GREAD}
-  LINK +=${CXX} -openmp
+  CFLAGS += -g -c -w1 -qopenmp $(OPT) -I${GREAD} -axCORE-AVX2 -O2
+  LINK +=${CXX} -qopenmp
 else
-  CFLAGS +=-O2 -ffast-math -g -c -Wall $(OPT) -I${GREAD} $(HDF_INC)
+  CFLAGS +=-O2 -ffast-math -g -c -Wall $(OPT) -I${GREAD} $(HDF_INC) -mavx2 -march=broadwell
   LINK +=${CXX} $(PRO)
   LFLAGS += -lm
 GCCV:=$(shell gcc --version )
@@ -76,6 +76,10 @@ dist: Makefile README $(head) Doxyfile gen-pk.cpp  read_fieldize.cpp  test.cpp  
 
 doc: Doxyfile gen-pk.h
 	doxygen $<
+
+.PHONY: clean celna clena celan
+
+celna clena celan: clean
 
 clean:
 	-rm -f ${objs} gen-pk.o gen-pk
